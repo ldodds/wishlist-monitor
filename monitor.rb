@@ -5,7 +5,7 @@ require 'hpricot'
 require 'yaml'
 require 'open-uri'
 
-#Check for config
+#Check for required config file
 if !File.exist?(ENV["HOME"] + "/.wishlist-monitor/config.yaml")
   puts "Configuration file is missing"
   puts "Create a file called ~/.wishlist-monitor/config.yaml"
@@ -50,18 +50,21 @@ end
 
 current_items.each do |asin, obj|
   if history["items"][asin] == nil
+	#Generate notification
     system "notify-send -i /usr/share/pixmaps/gnome-irc.png \"Now Tracking\" \"#{obj["title"]}\""    
   end
 end
 
 history["items"].merge!(current_items) do |asin, old, new|
   if new["price"] != old["price"] && old["price"] == "unavailable"
+	#Generate notification
     system "notify-send -i /usr/share/pixmaps/gnome-irc.png \"Now Available\" \"#{new["title"]} for #{new["price"]}\""
   end  
   if new["price"] == old["price"]
     #$stderr.puts "#{old["title"]} is still same price"
   end   
   if new["price"] < old["price"]
+	#Generate notification
     system "notify-send -i /usr/share/pixmaps/gnome-irc.png \"Price Reduction\" \"#{new["title"]} is now #{new["price"]}\""
   end    
   new
