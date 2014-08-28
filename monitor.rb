@@ -26,20 +26,19 @@ else
 end
 
 url = "http://www.amazon.co.uk/registry/wishlist/#{wishlist}?layout=compact"
-doc = Hpricot(open(url))
+doc = open(url) {|f| Hpricot(f.read.encode("UTF-8")) }
 
 current_items = {}
-  
-doc.search(".compact-items tbody tr")[1..-1].each do |item|
-  asin = item.parent["name"].split(".").last
-  title = item.at("td").inner_text.lstrip.rstrip
-  if !item.search("td[3] .price").empty?
-    currency = item.search("td[3] .price").attr("name").split(".")[4]
-    price = item.search("td[3] .price").attr("name").split(".")[5..-1].join(".")
-  else
-    currency = "unknown"
-    price = "unavailable"
-  end
+
+doc.search(".g-compact-items tr")[1..-1].each do |item|
+  title = item.at(".g-title a").inner_text.strip!
+  asin = item.at(".g-title a")["href"].split("/")[2].split("?")[0]
+
+  currency = "unknown"
+  price = item.at(".g-price span").inner_text.strip!
+  currency = price[0]
+  price = price[1..-1]
+
   current_items[asin] = {
     "asin"=>asin,
     "title"=>title,
@@ -56,7 +55,7 @@ current_items.each do |asin, obj|
 end
 
 history["items"].merge!(current_items) do |asin, old, new|
-  if new["price"] != old["price"] && old["price"] == "unavailable"
+  if new["price"] != old["price"] && old["currency"] == null
 	#Generate notification
     system "notify-send -i /usr/share/pixmaps/gnome-irc.png \"Now Available\" \"#{new["title"]} for #{new["price"]}\""
   end  
