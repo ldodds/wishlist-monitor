@@ -5,8 +5,27 @@ require 'hpricot'
 require 'yaml'
 require 'open-uri'
 
+# Method to check if notify-send exists in a cross-platform way.
+# The code is graciously borrowed from:
+# http://stackoverflow.com/questions/2108727/which-in-ruby-checking-if-program-exists-in-path-from-ruby
+def which(cmd)
+  exts = ENV['PATHEXT'] ? ENV['PATHEXT'].split(';') : ['']
+  ENV['PATH'].split(File::PATH_SEPARATOR).each do |path|
+    exts.each { |ext|
+      exe = File.join(path, "#{cmd}#{ext}")
+      return exe if File.executable?(exe) && !File.directory?(exe)
+    }
+  end
+  return nil
+end
+
+# Config and history filenames are variables
+# so we can leverage them in multiple palaces later
+config_file = "#{ENV['HOME']}/.wishlist-monitor/config.yaml"
+history_file = "#{ENV['HOME']}/.wishlist-monitor/history.json"
+
 #Check for required config file
-if !File.exist?(ENV["HOME"] + "/.wishlist-monitor/config.yaml")
+if !File.readable?(config_file)
   puts "Configuration file is missing"
   puts "Create a file called ~/.wishlist-monitor/config.yaml"
   puts "Then add the following configuration options:"
@@ -15,17 +34,18 @@ if !File.exist?(ENV["HOME"] + "/.wishlist-monitor/config.yaml")
 end
 
 #Load config
-config = YAML.load_file(ENV["HOME"] + "/.wishlist-monitor/config.yaml")
+config = YAML.load_file(config_file)
 wishlist = config["wishlist"]
+amazon_domain = config['amazon_domain']
 
 #Load history    
-if File.exist?(ENV["HOME"] + "/.wishlist-monitor/history.json")
-  history = JSON.parse(File.read("#{ENV["HOME"]}/.wishlist-monitor/history.json"))
+if File.readable?(history_file)
+  history = JSON.parse(File.read(history_file))
 else
   history = {"items"=> {}}
 end
 
-url = "http://www.amazon.co.uk/registry/wishlist/#{wishlist}?layout=compact"
+url = "http://#{amazon_domain}/registry/wishlist/#{wishlist}?layout=compact"
 doc = open(url) {|f| Hpricot(f.read.encode("UTF-8")) }
 
 current_items = {}
@@ -47,26 +67,28 @@ doc.search(".g-compact-items tr")[1..-1].each do |item|
   }
 end
 
-current_items.each do |asin, obj|
-  if history["items"][asin] == nil
-	#Generate notification
-    system "notify-send -i /usr/share/pixmaps/gnome-irc.png \"Now Tracking\" \"#{obj["title"]}\""    
+unless which('notify-send').nil?
+  current_items.each do |asin, obj|
+    if history["items"][asin] == nil
+    #Generate notification
+      system "notify-send -i /usr/share/pixmaps/gnome-irc.png \"Now Tracking\" \"#{obj["title"]}\""    
+    end
   end
-end
 
-history["items"].merge!(current_items) do |asin, old, new|
-  if new["price"] != old["price"] && old["currency"] == null
-	#Generate notification
-    system "notify-send -i /usr/share/pixmaps/gnome-irc.png \"Now Available\" \"#{new["title"]} for #{new["price"]}\""
-  end  
-  if new["price"] == old["price"]
-    #$stderr.puts "#{old["title"]} is still same price"
-  end   
-  if new["price"] < old["price"]
-	#Generate notification
-    system "notify-send -i /usr/share/pixmaps/gnome-irc.png \"Price Reduction\" \"#{new["title"]} is now #{new["price"]}\""
-  end    
-  new
+  history["items"].merge!(current_items) do |asin, old, new|
+    if new["price"] != old["price"] && old["currency"] == null
+    #Generate notification
+      system "notify-send -i /usr/share/pixmaps/gnome-irc.png \"Now Available\" \"#{new["title"]} for #{new["price"]}\""
+    end  
+    if new["price"] == old["price"]
+      #$stderr.puts "#{old["title"]} is still same price"
+    end   
+    if new["price"] < old["price"]
+    #Generate notification
+      system "notify-send -i /usr/share/pixmaps/gnome-irc.png \"Price Reduction\" \"#{new["title"]} is now #{new["price"]}\""
+    end    
+    new
+  end
 end
 
 history["items"].delete_if do |asin,obj|
@@ -75,6 +97,6 @@ history["items"].delete_if do |asin,obj|
 end
 
 #Save our history
-File.open("#{ENV["HOME"]}/.wishlist-monitor/history.json", "w") do |f|
+File.open(history_file, "w") do |f|
   JSON.dump(history, f)
 end
