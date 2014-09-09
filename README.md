@@ -16,7 +16,10 @@ Create the following file:
 
 The contents should be:
 
-	wishlist: ID_GOES_HERE
+```yaml
+  wishlist: ID_GOES_HERE
+  amazon_domain: DOMAIN_OF_LOCAL_AMAZON_SITE (www.amazon.com, www.amazon.co.uk, etc)
+```
 
 Where `ID_GOES_HERE` is the unique identifier for your wishlist. You can find it in the URL of your wishlist:
 
