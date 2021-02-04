@@ -6,9 +6,9 @@ This is a Ruby script I use to monitor my own Amazon wishlist. It alerts me when
 Installation
 ------------
 
-The code should run with Ruby 1.8.7 or higher. You'll need to install a few gems:
+The code should run with Ruby 2 or higher. You'll need to install a few gems:
 
-	sudo gem install hpricot json
+	bundle install
 
 Create the following file:
 
@@ -23,7 +23,7 @@ The contents should be:
 
 Where `ID_GOES_HERE` is the unique identifier for your wishlist. You can find it in the URL of your wishlist:
 
-	http://www.amazon.co.uk/registry/wishlist/ID_GOES_HERE
+	https://www.amazon.co.uk/hz/wishlist/genericItemsPage/ID_GOES_HERE
 
 You can then add a `crontab` entry to run the script as often as you like. Here's how I run mine:
 
@@ -44,7 +44,7 @@ Background
 
 I read a lot of Kindle books but reluctant to the same price as a paper; often the prices are more equivalent to hardback prices. I'm also reluctant to pay full price when I notice that sometimes Kindle editions can be heavily discounted. Sometimes just for a day (e.g. the Daily Deal) sometimes for slightly longer periods. I wanted to automate the bargain hunting.
 
-Having noticed that there are predictable URLs for wishlists and that the "compact" view is easily scrapeable, I wrote a quick script that regularly scans the items on my list and then compares them to their last known price. The script generates a desktop notification if it sees a discount. 
+Having noticed that there are predictable URLs for wishlists and that the "compact" view is easily scrapeable, I wrote a quick script that regularly scans the items on my list and then compares them to their last known price. The script generates a desktop notification if it sees a discount.
 
 At one point I was interested in building a service to do this, but the Amazon Product API has very prescriptive terms for storing and using data. The economics of Amazon marketplace prices would be interesting to watch.
 
@@ -60,7 +60,7 @@ There are lots of potential improvements:
 * It reports on all price changes. Would be better to set thresholds
 * It could track more price history, e.g. to summarise notifications
 * It could track a variety of prices, e.g. second-hand as well as new
-* There's a bug with some unavailable items being marked as dropping to zero price. 
+* There's a bug with some unavailable items being marked as dropping to zero price.
 * ...etc
 
 Some Observations

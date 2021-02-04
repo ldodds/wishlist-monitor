@@ -5,20 +5,6 @@ require 'hpricot'
 require 'yaml'
 require 'open-uri'
 
-# Method to check if notify-send exists in a cross-platform way.
-# The code is graciously borrowed from:
-# http://stackoverflow.com/questions/2108727/which-in-ruby-checking-if-program-exists-in-path-from-ruby
-def which(cmd)
-  exts = ENV['PATHEXT'] ? ENV['PATHEXT'].split(';') : ['']
-  ENV['PATH'].split(File::PATH_SEPARATOR).each do |path|
-    exts.each { |ext|
-      exe = File.join(path, "#{cmd}#{ext}")
-      return exe if File.executable?(exe) && !File.directory?(exe)
-    }
-  end
-  return nil
-end
-
 # Config and history filenames are variables
 # so we can leverage them in multiple palaces later
 config_file = "#{ENV['HOME']}/.wishlist-monitor/config.yaml"
@@ -38,61 +24,101 @@ config = YAML.load_file(config_file)
 wishlist = config["wishlist"]
 amazon_domain = config['amazon_domain']
 
-#Load history    
+# Method to check if notify-send exists in a cross-platform way.
+# The code is graciously borrowed from:
+# http://stackoverflow.com/questions/2108727/which-in-ruby-checking-if-program-exists-in-path-from-ruby
+def which(cmd)
+  exts = ENV['PATHEXT'] ? ENV['PATHEXT'].split(';') : ['']
+  ENV['PATH'].split(File::PATH_SEPARATOR).each do |path|
+    exts.each { |ext|
+      exe = File.join(path, "#{cmd}#{ext}")
+      return exe if File.executable?(exe) && !File.directory?(exe)
+    }
+  end
+  return nil
+end
+
+SILENT=false
+
+def notify(type, obj)
+  case type
+  when :tracking
+    msg = "\"Now Tracking\" \"#{obj["title"]}\""
+  when :available
+    msg = "\"#{obj["title"]} for #{obj["price"]}\""
+  when :changed
+    msg = "\"#{obj["title"]} is now #{obj["price"]}\""
+  else
+    msg = nil
+    #$stderr.puts "#{old["title"]} is still same price"
+  end
+  $stderr.puts msg if SILENT==true && msg != nil
+  system "notify-send --icon=/usr/share/pixmaps/evolution-data-server/category_gifts_16.png #{msg}" unless msg == nil || SILENT==true
+end
+
+def parse_items(amazon_domain, wishlist)
+  url = "http://#{amazon_domain}/hz/wishlist/printview/#{wishlist}"
+  doc = URI.open(url) {|f| Hpricot(f.read.encode("UTF-8")) }
+
+  current_items = {}
+
+  doc.search(".g-print-items .g-print-view-row")[1..-1].each do |item|
+    title = item.search("td.a-align-center span")[0].inner_text
+    asin = item["id"].split("tableRow_")[1]
+
+    currency = "unknown"
+    price = item.search("td")[3].inner_text
+    currency = price[0]
+    price = price[1..-1]
+    currency = nil if currency == " "
+    price = currency.nil? ? nil : price
+
+    current_items[asin] = {
+      "asin"=>asin,
+      "title"=>title,
+      "currency"=>currency,
+      "price"=>price.to_f
+    }
+  end
+  return current_items
+end
+
+
+#Load history
 if File.readable?(history_file)
   history = JSON.parse(File.read(history_file))
 else
   history = {"items"=> {}}
 end
 
-url = "http://#{amazon_domain}/registry/wishlist/#{wishlist}?layout=compact"
-doc = open(url) {|f| Hpricot(f.read.encode("UTF-8")) }
-
-current_items = {}
-
-doc.search(".g-compact-items tr")[1..-1].each do |item|
-  title = item.at(".g-title a").inner_text.strip!
-  asin = item.at(".g-title a")["href"].split("/")[2].split("?")[0]
-
-  currency = "unknown"
-  price = item.at(".g-price span").inner_text.strip!
-  currency = price[0]
-  price = price[1..-1]
-
-  current_items[asin] = {
-    "asin"=>asin,
-    "title"=>title,
-    "currency"=>currency,
-    "price"=>price.to_f
-  }
-end
+current_items = parse_items(amazon_domain, wishlist)
 
 unless which('notify-send').nil?
+
   current_items.each do |asin, obj|
     if history["items"][asin] == nil
-    #Generate notification
-      system "notify-send -i /usr/share/pixmaps/gnome-irc.png \"Now Tracking\" \"#{obj["title"]}\""    
+      notify(:tracking, obj)
     end
   end
 
   history["items"].merge!(current_items) do |asin, old, new|
-    if new["price"] != old["price"] && old["currency"] == null
-    #Generate notification
-      system "notify-send -i /usr/share/pixmaps/gnome-irc.png \"Now Available\" \"#{new["title"]} for #{new["price"]}\""
-    end  
-    if new["price"] == old["price"]
-      #$stderr.puts "#{old["title"]} is still same price"
-    end   
-    if new["price"] < old["price"]
-    #Generate notification
-      system "notify-send -i /usr/share/pixmaps/gnome-irc.png \"Price Reduction\" \"#{new["title"]} is now #{new["price"]}\""
-    end    
+    if old != nil
+      if new["price"] != old["price"] && old["currency"] == nil
+        notify(:available, new)
+      end
+      if new["price"] == old["price"]
+        notify(nil, new)
+      end
+      if new["price"] < old["price"]
+        notify(:change, new)
+      end
+    end
     new
   end
+
 end
 
 history["items"].delete_if do |asin,obj|
-  #Removed  
   current_items[asin] == nil
 end
 
