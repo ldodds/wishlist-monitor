@@ -27,9 +27,10 @@ Where `ID_GOES_HERE` is the unique identifier for your wishlist. You can find it
 
 You can then add a `crontab` entry to run the script as often as you like. Here's how I run mine:
 
-	35 * * * * env DISPLAY=:0.0 /home/ldodds/workspace/current/wishlist-monitor/monitor.rb
+35 * * * * eval "export $(egrep -z DBUS_SESSION_BUS_ADDRESS /proc/$(pgrep -u $LOGNAME gnome-session)/environ)"; /bin/bash -l -c 'cd /home/ldodds/workspaces/current/wishlist-monitor && bundle exec ruby monitor.rb' >> /tmp/wishlist 2>&1
 
-So the script executes at 35 minutes past every hour. The `env` setting ensures that notifications are displayed properly.
+
+The big crazy eval statement is to get Ubuntu to display the notifications in the main notifications panel. (No, I don't know)
 
 The first time it runs it'll tell you the items it is now tracking, and will also alert you when a new item is now being tracked.
 
