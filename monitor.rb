@@ -52,8 +52,8 @@ def notify(type, obj)
     msg = nil
     #$stderr.puts "#{old["title"]} is still same price"
   end
-  $stderr.puts msg if SILENT==true && msg != nil
-  system "notify-send --icon=/usr/share/pixmaps/evolution-data-server/category_gifts_16.png #{msg}" unless msg == nil || SILENT==true
+  $stderr.puts "#{type}: #{msg}" if SILENT==true && msg != nil
+  system "notify-send --icon=/usr/share/pixmaps/evolution-data-server/category_gifts_16.png \"#{type.capitalize.to_s}\" #{msg}" unless (msg == nil || SILENT==true)
 end
 
 def parse_items(amazon_domain, wishlist)
@@ -93,10 +93,13 @@ end
 
 current_items = parse_items(amazon_domain, wishlist)
 
+alerts = 0
+
 unless which('notify-send').nil?
 
   current_items.each do |asin, obj|
     if history["items"][asin] == nil
+      alerts = alerts + 1
       notify(:tracking, obj)
     end
   end
@@ -104,16 +107,22 @@ unless which('notify-send').nil?
   history["items"].merge!(current_items) do |asin, old, new|
     if old != nil
       if new["price"] != old["price"] && old["currency"] == nil
+        alerts = alerts + 1
         notify(:available, new)
       end
       if new["price"] == old["price"]
-        notify(nil, new)
+        #notify(nil, new)
       end
       if new["price"] < old["price"]
-        notify(:change, new)
+        alerts = alerts + 1
+        notify(:changed, new)
       end
     end
     new
+  end
+
+  if alerts == 0
+    system "notify-send --icon=/usr/share/pixmaps/evolution-data-server/category_gifts_16.png \"Wishlist monitor\" \"No price changes\"" unless SILENT==true
   end
 
 end
@@ -126,3 +135,5 @@ end
 File.open(history_file, "w") do |f|
   JSON.dump(history, f)
 end
+
+$stderr.puts "Wishlist monitor completed. Send #{alerts} alerts"
